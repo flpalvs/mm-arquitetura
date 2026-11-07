@@ -99,23 +99,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .link span { display: inline-block; transition: transform .4s var(--ease); }
 .link:hover span { transform: translateX(.5rem); }
 
-/* ---------- Abertura (logo + frase digitada) ---------- */
-.intro-screen {
-  display: none; position: fixed; inset: 0; z-index: 300;
-  place-content: center; justify-items: center; gap: 2rem; text-align: center;
-  background: var(--brown-800); color: var(--offwhite);
-  --r: -40px;
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--r), #000 calc(var(--r) + 40px));
-  mask-image: radial-gradient(circle at 50% 50%, transparent var(--r), #000 calc(var(--r) + 40px));
-}
-.intro-on .intro-screen { display: grid; }
-.intro-on body { overflow: hidden; }
-.intro-screen img { width: clamp(200px, 34vw, 340px); height: auto; opacity: 0; transform: translateY(10px); animation: introLogo 1.2s var(--ease) .2s forwards; }
-.intro-screen__text { font-family: var(--font-display); font-style: italic; font-size: clamp(1.6rem, 4vw, 2.8rem); color: var(--gold); min-height: 1.3em; padding: 0 var(--pad); }
-.caret { display: inline-block; width: 1px; height: .9em; margin-left: 4px; background: var(--gold); vertical-align: -.08em; animation: blink .8s steps(1) infinite; }
-@keyframes introLogo { to { opacity: 1; transform: none; } }
-@keyframes blink { 50% { opacity: 0; } }
-
 /* ---------- Cabeçalho ---------- */
 .header {
   position: fixed; inset: 0 0 auto 0; z-index: 100;

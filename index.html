@@ -19,16 +19,9 @@
   <link rel="stylesheet" href="css/style.css">
   <script>
     document.documentElement.classList.add('js');
-    try {
-      if (!sessionStorage.getItem('mm-intro') && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('intro-on');
-    } catch (e) {}
   </script>
 </head>
 <body>
-  <div class="intro-screen" aria-hidden="true">
-    <img decoding="async" src="assets/logo-claro.png" alt="" width="600" height="51">
-    <p class="intro-screen__text"><span class="typed"></span><i class="caret"></i></p>
-  </div>
   <a class="skip" href="#conteudo">Ir para o conteúdo</a>
 
   <header class="header">

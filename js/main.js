@@ -5,38 +5,6 @@
   const $ = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => Array.from(c.querySelectorAll(s));
 
-  /* ---------- Abertura: logo + frase digitada ---------- */
-  const introEl = $('.intro-screen');
-  if (introEl && root.classList.contains('intro-on')) {
-    const phrase = 'Arquitetura com propósito.';
-    const out = $('.typed', introEl);
-    let n = 0;
-    let closing = false;
-    const finish = () => {
-      if (closing) return;
-      closing = true;
-      try { sessionStorage.setItem('mm-intro', '1'); } catch (e) {}
-      // círculo que se abre do centro, revelando o hero por trás
-      const end = Math.hypot(window.innerWidth, window.innerHeight) / 2 + 60;
-      const DUR = 2600;
-      const t0 = performance.now();
-      const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-      const step = (now) => {
-        const p = Math.min((now - t0) / DUR, 1);
-        introEl.style.setProperty('--r', (-40 + (end + 40) * ease(p)).toFixed(1) + 'px');
-        if (p < 1) requestAnimationFrame(step); else { introEl.remove(); root.classList.remove('intro-on'); }
-      };
-      requestAnimationFrame(step);
-    };
-    const type = () => {
-      out.textContent = phrase.slice(0, ++n);
-      if (n < phrase.length) setTimeout(type, 70 + Math.random() * 40);
-      else setTimeout(finish, 1100);
-    };
-    setTimeout(type, 1300);
-    setTimeout(finish, 9000); // segurança
-  }
-
   /* ---------- Cabeçalho ---------- */
   const header = $('.header');
   const onHeader = () => {
