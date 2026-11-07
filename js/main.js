@@ -50,6 +50,8 @@
       const past = counter.getBoundingClientRect().bottom <= window.innerHeight * 0.6;
       solid = past;
       fade = past ? 1 : Math.min(1, Math.max(0, 1 - window.scrollY / (hero.offsetHeight * 0.55)));
+      const ch = $('[data-chapters]');
+      if (ch && solid) { const r = ch.getBoundingClientRect(); if (r.top <= 1 && r.bottom > window.innerHeight * 0.5) solid = false; }
     }
     if (menuOpen) fade = 1;
     header.classList.toggle('is-solid', solid);
@@ -161,76 +163,105 @@
     }
   }
 
-  /* ---------- Cards empilhados (ScrollStack, rolagem da página) ---------- */
-  $$('[data-stack]').forEach((root) => {
-    const cards = $$('.stack-card', root);
-    const n = cards.length;
-    if (!n) return;
-    const DISTANCE = 100;     // espaço entre cards antes de empilhar
-    const OFFSET = 24;        // quanto cada card fica abaixo do anterior
-    const SCALE = 0.05;       // encolhimento por card por cima
-    const BASE_SCALE = 0.8;
-    const DIM = 0.2;          // escurecimento por card por cima
-    const HOLD = 200;         // pilha fixa antes de soltar
-    const stackTop = () => Math.max(112, window.innerHeight * 0.14);
-
-    const inner = document.createElement('div');
-    inner.className = 'stack__inner';
-    const slots = cards.map((card, i) => {
-      if (i > 0) {
-        const gap = DISTANCE - (n - i) * OFFSET;
-        const sp = document.createElement('div');
-        sp.className = 'stack__spacer';
-        sp.setAttribute('aria-hidden', 'true');
-        sp.style.height = Math.max(0, gap) + 'px';
-        sp.style.marginTop = Math.min(0, gap) + 'px';
-        inner.appendChild(sp);
-      }
-      const slot = document.createElement('div');
-      slot.className = 'stack__slot';
-      slot.style.marginBottom = (n - 1 - i) * OFFSET + 'px';
-      slot.style.zIndex = String(i + 1);
-      slot.appendChild(card);
-      inner.appendChild(slot);
-      return slot;
-    });
-    const end = document.createElement('div');
-    end.style.height = HOLD + 'px';
-    end.setAttribute('aria-hidden', 'true');
-    inner.appendChild(end);
-    root.appendChild(inner);
-
-    let frame = 0;
-    const layout = () => {
-      const top = stackTop();
-      slots.forEach((slot, i) => { slot.style.top = (top + i * OFFSET).toFixed(1) + 'px'; });
+  /* ---------- Residencial + Comercial: a foto se abre em tela cheia; a 2ª cena cobre a 1ª ---------- */
+  $$('[data-chapters]').forEach((sec) => {
+    const panels = $$('[data-panel]', sec).map((el) => ({ el, media: $('.cpanel__media', el), img: $('.cpanel__media img', el) }));
+    const idx = $('.chapters__index', sec);
+    if (panels.length < 2) return;
+    if (reduce) { panels.forEach((pn) => pn.el.classList.add('is-in')); return; }
+    const [a, b] = panels;
+    let target = 0, current = 0, raf = 0, near = false;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const seg = (p, s, e) => clamp((p - s) / (e - s), 0, 1);
+    const io3 = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    const read = () => {
+      const r = sec.getBoundingClientRect(), vh = window.innerHeight;
+      // -1 … 0: entrando por baixo · 0 … 1: fixa na tela
+      target = r.top > 0 ? -clamp(r.top / vh, 0, 1) : clamp(-r.top / Math.max(1, r.height - vh), 0, 1);
     };
-    const update = () => {
-      frame = 0;
-      const top = stackTop();
-      const heights = slots.map((s) => s.offsetHeight);
-      const tops = slots.map((s) => s.getBoundingClientRect().top);
-      const depths = slots.map(() => 0);
-      for (let j = 1; j < n; j++) {
-        const pinBefore = top + (j - 1) * OFFSET;
-        const start = pinBefore + heights[j - 1];
-        const span = Math.max(1, start - pinBefore - OFFSET);
-        const cover = Math.min(1, Math.max(0, (start - tops[j]) / span));
-        for (let i = 0; i < j; i++) depths[i] += cover;
-      }
-      cards.forEach((card, i) => {
-        const d = depths[i];
-        const scale = Math.max(BASE_SCALE, 1 - d * SCALE);
-        card.style.transform = d < 0.0005 || reduce ? '' : 'scale(' + scale.toFixed(4) + ')';
-        card.style.setProperty('--dim', (1 - Math.pow(1 - DIM, d)).toFixed(3));
+    const frame = () => {
+      raf = 0;
+      current += (target - current) * 0.1;
+      if (Math.abs(target - current) < 0.0004) current = target;
+      const p = current;
+      // abertura: a foto chega recortada nas laterais e se abre até as bordas
+      const open = io3(clamp(1 + p, 0, 1));
+      a.media.style.clipPath = open >= 1 ? '' : 'inset(0 ' + ((1 - open) * 7).toFixed(2) + 'vw round ' + ((1 - open) * 6).toFixed(1) + 'px)';
+      // troca: a 2ª cena sobe por cima; a 1ª afunda e escurece
+      const c = io3(seg(p, 0.2, 0.7));
+      b.el.style.clipPath = 'inset(' + ((1 - c) * 100).toFixed(2) + '% 0 0 0)';
+      b.el.style.visibility = c > 0 ? 'visible' : 'hidden';
+      a.img.style.transform = 'translate3d(0,' + (-c * 8).toFixed(2) + '%,0) scale(' + (1.16 - 0.16 * open).toFixed(4) + ')';
+      a.media.style.setProperty('--dim', (c * 0.6).toFixed(3));
+      b.img.style.transform = 'translate3d(0,' + ((1 - c) * 14).toFixed(2) + '%,0) scale(' + (1.1 - 0.1 * c).toFixed(4) + ')';
+      a.el.classList.toggle('is-in', p > -0.3 && c < 0.4);
+      b.el.classList.toggle('is-in', c > 0.6);
+      if (idx) idx.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
+      if (current !== target && near) raf = requestAnimationFrame(frame);
+    };
+    const kick = () => { read(); if (!raf) raf = requestAnimationFrame(frame); };
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((e) => { near = e[0].isIntersecting; if (near) kick(); }, { rootMargin: '40% 0px' }).observe(sec);
+    } else near = true;
+    window.addEventListener('scroll', () => { if (near) kick(); }, { passive: true });
+    window.addEventListener('resize', kick);
+    read(); current = target; frame();
+  });
+
+  /* ---------- Projetos: a rolagem vertical move a faixa de cards para o lado ---------- */
+  $$('[data-hscroll]').forEach((sec) => {
+    const track = $('.hscroll__track', sec);
+    const bar = $('.hscroll__bar', sec);
+    const cards = $$('.pcard', sec);
+    if (!track || !cards.length) return;
+    cards.forEach((c, i) => c.style.setProperty('--d', (i * 0.09).toFixed(2) + 's'));
+    if ('IntersectionObserver' in window && !reduce) {
+      const io = new IntersectionObserver((e) => { if (e[0].isIntersecting) { sec.classList.add('is-in'); io.disconnect(); } }, { threshold: 0.2 });
+      io.observe(sec);
+    } else sec.classList.add('is-in');
+    if (reduce) return;
+    sec.classList.add('is-pinned');
+    let dist = 0, target = 0, current = 0, raf = 0, near = false, items = [];
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const read = () => {
+      const r = sec.getBoundingClientRect();
+      target = clamp(-r.top / Math.max(1, r.height - window.innerHeight), 0, 1);
+    };
+    const frame = () => {
+      raf = 0;
+      current += (target - current) * 0.12;
+      if (Math.abs(target - current) < 0.0002) current = target;
+      const x = -dist * current, vw = window.innerWidth;
+      track.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0)';
+      if (bar) bar.style.setProperty('--p', current.toFixed(4));
+      // cada foto desliza um pouco dentro do card (parallax lateral)
+      items.forEach((it) => {
+        const k = clamp((it.x + x + it.w / 2 - vw / 2) / vw, -1, 1);
+        it.img.style.transform = 'translate3d(' + (-k * 6).toFixed(2) + '%,0,0)';
       });
+      if (current !== target && near) raf = requestAnimationFrame(frame);
     };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
-    layout();
-    update();
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', () => { layout(); schedule(); });
-    if ('ResizeObserver' in window) new ResizeObserver(() => { layout(); schedule(); }).observe(inner);
+    const kick = () => { read(); if (!raf) raf = requestAnimationFrame(frame); };
+    const layout = () => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const last = cards[cards.length - 1];
+      const pad = parseFloat(getComputedStyle(track).paddingLeft) || 0;
+      dist = Math.max(0, last.offsetLeft + last.offsetWidth + pad - vw);
+      // no desktop a faixa anda mais rápido que a rolagem: menos scroll para ver tudo
+      sec.style.height = (vh + dist * (vw > 800 ? 0.5 : 0.7)).toFixed(0) + 'px';
+      items = cards.map((c) => ({ img: $('img', c), x: c.offsetLeft, w: c.offsetWidth }));
+      kick();
+    };
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((e) => {
+        near = e[0].isIntersecting;
+        if (near) { cards.forEach((c) => { const im = $('img', c); if (im) im.loading = 'eager'; }); kick(); }
+      }, { rootMargin: '60% 0px' }).observe(sec);
+    } else near = true;
+    window.addEventListener('scroll', () => { if (near) kick(); }, { passive: true });
+    window.addEventListener('resize', layout);
+    if (document.fonts) document.fonts.ready.then(layout);
+    layout(); current = target; frame();
   });
 
   /* ---------- Galeria masonry + ampliar foto ---------- */
@@ -344,7 +375,7 @@
     const total = parseInt(num.dataset.count, 10);
     if (reduce || n < 2) return;
     let target = 0, current = 0, raf = 0, near = false;
-    const INTRO = 0.2; // início da seção: a 1ª foto ocupa a tela toda e vai diminuindo até o padrão da fileira
+    const INTRO = 0.22; // início da seção: a 1ª foto ocupa a tela toda e vai diminuindo até o padrão da fileira
     const ease = (x) => 1 - Math.pow(1 - x, 3);
     const smooth = (x) => x * x * (3 - 2 * x);
     const io3 = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
@@ -358,7 +389,7 @@
     };
     const frame = () => {
       raf = 0;
-      current += (target - current) * 0.08;
+      current += (target - current) * 0.1;
       if (Math.abs(target - current) < 0.0004) current = target;
       num.textContent = Math.round(total * ease(clamp((current - INTRO) / (0.85 - INTRO), 0, 1)));
 
@@ -468,16 +499,16 @@
     };
     const frame = () => {
       raf = 0;
-      current += (target - current) * 0.06;
+      current += (target - current) * 0.1;
       if (Math.abs(target - current) < 0.0003) current = target;
       const p = current, vw = window.innerWidth, vh = window.innerHeight;
 
-      // abertura: 1) a frase desdobra (tempo) 2) as fotos sobem 3) as fotos trocam duas vezes
+      // abertura: 1) a frase desdobra (tempo) 2) as fotos sobem 3) as fotos trocam uma vez
       sides.forEach((sd) => {
-        const lag = sd.lag * 0.012;
-        const rv = io3(seg(p, 0.03 + lag, 0.08 + lag));
+        const lag = sd.lag * 0.015;
+        const rv = io3(seg(p, 0.01 + lag, 0.08 + lag));
         sd.el.style.clipPath = 'inset(' + ((1 - rv) * 100).toFixed(2) + '% 0 0 0)';
-        const q = io3(seg(p, 0.1 + lag, 0.15 + lag)) + io3(seg(p, 0.16 + lag, 0.21 + lag)); // 0 .. 2
+        const q = io3(seg(p, 0.1 + lag, 0.18 + lag)); // 0 .. 1
         const i0 = Math.min(sd.imgs.length - 2, Math.floor(q));
         const f = q - i0;
         sd.imgs.forEach((im, i) => {
@@ -492,17 +523,17 @@
       });
 
       // depois, a abertura sai para a esquerda, como quem vira a página; a 1ª etapa chega pela direita
-      const a = sine(seg(p, 0.24, 0.35));
+      const a = sine(seg(p, 0.2, 0.3));
       intro.style.transform = 'translate3d(' + (-vw * a).toFixed(1) + 'px,0,0)';
       intro.style.visibility = a >= 1 ? 'hidden' : 'visible';
 
-      const S = 0.36, L = (1 - S) / steps.length; // cada etapa ocupa L da rolagem
+      const S = 0.3, L = (1 - S) / steps.length; // cada etapa ocupa L da rolagem
       steps.forEach((st, k) => {
         const s0 = S + k * L;
         const last = k === steps.length - 1;
         // virar página: a etapa entra pela direita enquanto a anterior sai pela esquerda
-        const enterStart = k === 0 ? 0.24 : s0 - L * 0.2;
-        const enterEnd = k === 0 ? 0.35 : s0 + L * 0.12;
+        const enterStart = k === 0 ? 0.2 : s0 - L * 0.2;
+        const enterEnd = k === 0 ? 0.3 : s0 + L * 0.12;
         const ent = sine(seg(p, enterStart, enterEnd));
         const tout = last ? 0 : sine(seg(p, s0 + L * 0.8, s0 + L * 1.12));
         const x = (1 - ent) * vw - tout * vw;
@@ -556,10 +587,13 @@
   /* ---------- Entrada suave dos elementos ---------- */
   const revealEls = $$('[data-reveal], .reveal-img');
   if ('IntersectionObserver' in window && !reduce) {
+    // quadros recortados por clip-path não contam como visíveis: observa o elemento pai
     const io = new IntersectionObserver((entries) => {
-      entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } });
+      entries.forEach((en) => { if (en.isIntersecting) { (en.target._reveal || en.target).classList.add('is-in'); io.unobserve(en.target); } });
     }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-    revealEls.forEach((el) => io.observe(el));
+    revealEls.forEach((el) => {
+      if (el.classList.contains('reveal-img') && el.parentElement) { el.parentElement._reveal = el; io.observe(el.parentElement); } else io.observe(el);
+    });
   } else revealEls.forEach((el) => el.classList.add('is-in'));
 
   /* ---------- Movimento na rolagem (parallax, faixa, hero) ---------- */
